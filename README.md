@@ -1,36 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Code Refactor Tutor
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+A web application built for the Next.js Global Hackathon that uses AI to provide refactoring suggestions for JavaScript/React code snippets. Enter your code, and get AI-powered advice on how to improve its readability, maintainability, and adherence to best practices.
+
+![Screenshot of App](https://i.imgur.com/M1ZwGBh.png)
+
+## Features
+
+* Paste JavaScript or React code snippets into a text area.
+* Click "Analyze Code" to send the snippet to an AI model (Anthropic Claude).
+* Receive AI-generated refactoring suggestions with explanations.
+* Clean, responsive UI built with Next.js and Tailwind CSS.
+* Loading and error states for user feedback.
+* Uses `lucide-react` for icons.
+
+## Tech Stack
+
+* **Framework:** Next.js 14+ (App Router)
+* **Language:** TypeScript
+* **Styling:** Tailwind CSS
+* **AI:** Anthropic Claude API (using model `claude-3-7-sonnet-20250219` - *confirm/update if you changed it*)
+* **AI SDK:** `@anthropic-ai/sdk`
+* **UI:** React, `lucide-react`
 
 ## Getting Started
 
-First, run the development server:
+Follow these instructions to get a copy of the project up and running on your local machine for development and testing purposes.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+### Prerequisites
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+* Node.js (v18 or later recommended)
+* npm or yarn
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Installation & Setup
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1.  **Clone the repository:**
+    ```bash
+    git clone <your-repository-url>
+    cd ai-refactor-tutor
+    ```
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    # or
+    # yarn install
+    ```
+3.  **Set up Environment Variables:**
+    * Create a file named `.env.local` in the root directory of the project.
+    * Add your Anthropic API key to this file:
+        ```plaintext
+        ANTHROPIC_API_KEY=your_anthropic_api_key_here
+        ```
+    * **Important:** Ensure `.env.local` is listed in your `.gitignore` file to avoid committing your secret key.
 
-## Learn More
+4.  **Run the development server:**
+    ```bash
+    npm run dev
+    # or
+    # yarn dev
+    ```
+5.  Open [http://localhost:3000](http://localhost:3000) with your browser to see the application.
 
-To learn more about Next.js, take a look at the following resources:
+## How to Use
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1.  Navigate to the application in your browser.
+2.  Paste a snippet of JavaScript or React code into the text area.
+3.  Click the "Analyze Code" button.
+4.  Wait for the AI to process the code (a loading indicator will show).
+5.  View the refactoring suggestions and explanations displayed below the input area.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Potential Future Improvements
 
-## Deploy on Vercel
+* Add syntax highlighting to the input area (using a compatible library/method).
+* Support for more programming languages.
+* Allow users to select specific refactoring rules or categories.
+* Implement user accounts and history.
+* Add functionality to directly apply suggested changes.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Hackathon
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This project was created for the [Next.js Global Hackathon](https://nextjs.org/hackathon) (AI Theme).
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details (if you choose to add one).
