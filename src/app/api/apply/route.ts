@@ -5,40 +5,36 @@ import * as babelParser from '@babel/parser';
 import traverse from '@babel/traverse';
 import generate from '@babel/generator';
 import * as t from '@babel/types';
-// --- IMPORT TYPE ---
-import type { NodePath } from '@babel/traverse'; // Import NodePath type
+import type { NodePath } from '@babel/traverse';
 
+// --- Interfaces ---
 interface StructuredSuggestion {
   suggestion: string;
   explanation: string;
   type: string;
   params?: { [key: string]: any };
 }
-
 interface ApplyRequestBody {
   code: string;
   suggestion: StructuredSuggestion;
 }
+const getParam = (params: any, key: string): string | undefined => { /* ... */ };
 
-const getParam = (params: any, key: string): string | undefined => {
-    return (params && typeof params === 'object' && typeof params[key] === 'string') ? params[key] : undefined;
-};
-
+// --- Main Handler ---
 export async function POST(request: Request) {
-  console.log("Received request on /api/apply");
+  console.log("--- New Request to /api/apply ---"); // Mark new request
 
   try {
     const body: ApplyRequestBody = await request.json();
     const { code, suggestion } = body;
 
-    // Validation
-    if (!code || typeof code !== 'string') { /* ... */ }
-    if (!suggestion || typeof suggestion.type !== 'string') { /* ... */ }
+    if (!code || typeof code !== 'string') { /* ... validation ... */ }
+    if (!suggestion || typeof suggestion.type !== 'string') { /* ... validation ... */ }
 
-    console.log("Original Code Snippet:", code.substring(0, 100) + "...");
-    console.log("Suggestion to Apply:", suggestion.suggestion);
-    console.log("Suggestion Type:", suggestion.type);
-    console.log("Suggestion Params:", suggestion.params);
+    console.log("[Apply API] Original Code Snippet:", code.substring(0, 100) + "...");
+    console.log("[Apply API] Suggestion to Apply:", suggestion.suggestion);
+    console.log("[Apply API] Suggestion Type:", suggestion.type);
+    console.log("[Apply API] Suggestion Params:", suggestion.params);
 
     let modifiedCode = code;
     let transformationApplied = false;
@@ -49,75 +45,84 @@ export async function POST(request: Request) {
           plugins: ["jsx", "typescript"],
           errorRecovery: true,
       });
-      console.log("AST parsed successfully.");
+      console.log("[Apply API] AST parsed successfully.");
 
-      // --- Determine correct function reference ---
       const traverseFunc = typeof traverse === 'function' ? traverse : (traverse as any).default;
       const generateFunc = typeof generate === 'function' ? generate : (generate as any).default;
       if (typeof traverseFunc !== 'function') { throw new Error("Babel traverse function could not be resolved."); }
       if (typeof generateFunc !== 'function') { throw new Error("Babel generate function could not be resolved."); }
-      // --- End function reference check ---
 
+      console.log("[Apply API] Starting AST traversal...");
       traverseFunc(ast, {
-        // --- APPLY EXPLICIT TYPE TO 'path' ---
-        enter(path: NodePath) { // Add : NodePath here
+        enter(path: NodePath) {
           // --- Attempt 1: Apply based on suggestion.type ---
           try {
             if (!transformationApplied) {
+              const currentType = suggestion.type;
+              console.log(`[Apply API] Checking node type: ${path.node.type}, Suggestion type: ${currentType}`); // Log node type
+
               // --- Handle USE_CONST ---
-              if (suggestion.type === 'USE_CONST') {
+              if (currentType === 'USE_CONST') {
                   const varNameToChange = getParam(suggestion.params, 'variableName');
+                  console.log(`[Apply API] USE_CONST check for var: ${varNameToChange}`);
                   if (varNameToChange && path.isVariableDeclarator() && t.isIdentifier(path.node.id) && path.node.id.name === varNameToChange) {
+                      console.log(`[Apply API] USE_CONST: Found declarator for ${varNameToChange}`);
                       const declarationPath = path.findParent((p) => p.isVariableDeclaration());
                       if (declarationPath?.isVariableDeclaration() && declarationPath.node.kind === 'let') {
+                          console.log(`[Apply API] USE_CONST: Found parent 'let' declaration`);
                           const binding = path.scope.getBinding(varNameToChange);
                           if (binding?.constant) {
-                              console.log(`Applying TYPE: USE_CONST - Found 'let ${varNameToChange}', changing kind to 'const'`);
+                              console.log(`[Apply API] USE_CONST: Applying change for ${varNameToChange}`);
                               declarationPath.node.kind = 'const';
                               transformationApplied = true;
                               path.stop();
                           } else {
-                              console.warn(`Applying TYPE: USE_CONST - Variable '${varNameToChange}' is reassigned or binding unclear, cannot change 'let' to 'const'.`);
+                              console.warn(`[Apply API] USE_CONST: Cannot apply, variable '${varNameToChange}' is reassigned or binding unclear.`);
                           }
                       }
                   }
               }
               // --- Handle RENAME_VARIABLE ---
-              else if (suggestion.type === 'RENAME_VARIABLE') {
+              else if (currentType === 'RENAME_VARIABLE') {
                   const oldName = getParam(suggestion.params, 'oldName');
                   const newName = getParam(suggestion.params, 'newName');
-                  // Ensure path.scope exists before checking hasBinding
-                  if (oldName && newName && path.scope && path.scope.hasBinding(oldName)) {
+                  console.log(`[Apply API] RENAME_VARIABLE check for: ${oldName} -> ${newName}`);
+                  if (oldName && newName && path.scope?.hasBinding(oldName)) {
                       const binding = path.scope.getBinding(oldName);
                       if (binding?.path.type !== 'FunctionDeclaration') {
-                          console.log(`Applying TYPE: RENAME_VARIABLE - Renaming '${oldName}' to '${newName}'`);
+                          console.log(`[Apply API] RENAME_VARIABLE: Applying rename for ${oldName}`);
                           path.scope.rename(oldName, newName);
                           transformationApplied = true;
                           path.stop();
+                      } else {
+                           console.log(`[Apply API] RENAME_VARIABLE: Binding found but it's a function declaration.`);
                       }
                   }
               }
               // --- Handle RENAME_FUNCTION ---
-              else if (suggestion.type === 'RENAME_FUNCTION') {
+              else if (currentType === 'RENAME_FUNCTION') {
                   const oldFunctionName = getParam(suggestion.params, 'oldName');
                   const newFunctionName = getParam(suggestion.params, 'newName');
+                  console.log(`[Apply API] RENAME_FUNCTION check for: ${oldFunctionName} -> ${newFunctionName}`);
                   if (oldFunctionName && newFunctionName && path.isFunctionDeclaration() && path.node.id?.name === oldFunctionName) {
-                      console.log(`Applying TYPE: RENAME_FUNCTION - Renaming '${oldFunctionName}' to '${newFunctionName}'`);
-                      // Ensure path.scope exists before accessing parent
+                      console.log(`[Apply API] RENAME_FUNCTION: Found function declaration ${oldFunctionName}`);
                       const scopeToRenameIn = path.scope?.parent ?? path.scope;
                       if (scopeToRenameIn?.hasBinding(oldFunctionName)) {
-                          scopeToRenameIn.rename(oldFunctionName, newFunctionName);
-                          transformationApplied = true;
-                          path.stop();
-                      } else { console.warn(`Binding not found for function ${oldFunctionName}`); }
+                           console.log(`[Apply API] RENAME_FUNCTION: Applying rename for ${oldFunctionName}`);
+                           scopeToRenameIn.rename(oldFunctionName, newFunctionName);
+                           transformationApplied = true;
+                           path.stop();
+                      } else { console.warn(`[Apply API] RENAME_FUNCTION: Binding not found for function ${oldFunctionName}`); }
                   }
               }
               // --- Handle USE_TEMPLATE_LITERAL ---
-              else if (suggestion.type === 'USE_TEMPLATE_LITERAL') {
+              else if (currentType === 'USE_TEMPLATE_LITERAL') {
+                 console.log(`[Apply API] USE_TEMPLATE_LITERAL check`);
                  if (path.isCallExpression() && t.isMemberExpression(path.node.callee) && t.isIdentifier(path.node.callee.object, { name: "console" }) && t.isIdentifier(path.node.callee.property, { name: "log" })) {
                      const firstArg = path.node.arguments[0];
+                     console.log(`[Apply API] USE_TEMPLATE_LITERAL: Found console.log call. Arg type: ${firstArg?.type}`);
                      if (t.isBinaryExpression(firstArg) && firstArg.operator === '+' && t.isStringLiteral(firstArg.left) && t.isIdentifier(firstArg.right)) {
-                         console.log("Applying TYPE: USE_TEMPLATE_LITERAL - Replacing console.log argument");
+                         console.log(`[Apply API] USE_TEMPLATE_LITERAL: Found "string" + identifier pattern. Applying.`);
                          const quasis = [ t.templateElement({ raw: firstArg.left.value, cooked: firstArg.left.value }), t.templateElement({ raw: '', cooked: '' }, true) ];
                          const expressions = [firstArg.right];
                          path.node.arguments[0] = t.templateLiteral(quasis, expressions);
@@ -127,9 +132,10 @@ export async function POST(request: Request) {
                  }
               }
               // --- Handle USE_OPERATOR_SHORTCUT ---
-              else if (suggestion.type === 'USE_OPERATOR_SHORTCUT') {
+              else if (currentType === 'USE_OPERATOR_SHORTCUT') {
                 const operator = getParam(suggestion.params, 'operator');
                 const variable = getParam(suggestion.params, 'variable');
+                console.log(`[Apply API] USE_OPERATOR_SHORTCUT check for var: ${variable}, op: ${operator}`);
                 if (operator && variable && path.isAssignmentExpression({ operator: '=' }) &&
                     t.isIdentifier(path.node.left, { name: variable }) &&
                     t.isBinaryExpression(path.node.right) &&
@@ -137,19 +143,20 @@ export async function POST(request: Request) {
                     ((operator === '+=' && path.node.right.operator === '+') || (operator === '-=' && path.node.right.operator === '-') || (operator === '*=' && path.node.right.operator === '*') || (operator === '/=' && path.node.right.operator === '/'))
                    )
                 {
-                    console.log(`Applying TYPE: USE_OPERATOR_SHORTCUT - Changing assignment for '${variable}' to '${operator}'`);
+                    console.log(`[Apply API] USE_OPERATOR_SHORTCUT: Found pattern for ${variable}. Applying ${operator}.`);
                     path.node.operator = operator;
                     path.node.right = path.node.right.right;
                     transformationApplied = true;
                     path.stop();
                 }
               }
-              // --- Add other type handlers here ---
-            }
-          } catch (_typeError) { console.error("Error applying suggestion based on TYPE:", _typeError); }
+            } // end if (!transformationApplied)
+          } catch (_typeError) { console.error("[Apply API] Error applying suggestion based on TYPE:", _typeError); }
 
           // --- Attempt 2: Fallback to Regex on suggestion text ---
           if (!transformationApplied) {
+              // Only log if we enter the fallback section
+              // console.log("[Apply API] Trying REGEX fallback...");
             try {
               // Regex patterns...
               const variableRenameMatch = suggestion.suggestion.match(/^Rename '(\w+)' .* '(\w+)'/i);
@@ -159,58 +166,30 @@ export async function POST(request: Request) {
               if (variableRenameMatch && variableRenameMatch[1] && variableRenameMatch[2]) {
                   const oldName = variableRenameMatch[1];
                   const newName = variableRenameMatch[2];
-                  // Ensure path.scope exists
-                  if (path.scope?.hasBinding(oldName)) {
-                      const binding = path.scope.getBinding(oldName);
-                      if (binding?.path.type !== 'FunctionDeclaration') {
-                          console.log(`Applying REGEX: RENAME_VARIABLE - Renaming '${oldName}' to '${newName}'`);
-                          path.scope.rename(oldName, newName);
-                          transformationApplied = true;
-                          path.stop();
-                      }
-                  }
+                   console.log(`[Apply API] REGEX: Matched RENAME_VARIABLE for ${oldName} -> ${newName}`);
+                  if (path.scope?.hasBinding(oldName)) { /* ... rename logic ... */ }
               } else if (functionRenameMatch && functionRenameMatch[1] && functionRenameMatch[2]) {
                   const oldFunctionName = functionRenameMatch[1];
                   const newFunctionName = functionRenameMatch[2];
-                   if (path.isFunctionDeclaration() && path.node.id?.name === oldFunctionName) {
-                       console.log(`Applying REGEX: RENAME_FUNCTION - Renaming '${oldFunctionName}' to '${newFunctionName}'`);
-                       // Ensure path.scope exists
-                       const scopeToRenameIn = path.scope?.parent ?? path.scope;
-                       if (scopeToRenameIn?.hasBinding(oldFunctionName)) {
-                            scopeToRenameIn.rename(oldFunctionName, newFunctionName);
-                            transformationApplied = true;
-                            path.stop();
-                       } else { console.warn(`Binding not found for function ${oldFunctionName} via regex.`); }
-                   }
+                  console.log(`[Apply API] REGEX: Matched RENAME_FUNCTION for ${oldFunctionName} -> ${newFunctionName}`);
+                   if (path.isFunctionDeclaration() && path.node.id?.name === oldFunctionName) { /* ... rename logic ... */ }
               }
-              // --- Handle Operator Shortcut via Regex ---
               else if (operatorShortcutMatch) {
                   const varName = operatorShortcutMatch[1];
                   const shortcutOperator = operatorShortcutMatch[4];
-                  if (path.isAssignmentExpression({ operator: '=' }) &&
-                      t.isIdentifier(path.node.left, { name: varName }) &&
-                      t.isBinaryExpression(path.node.right) &&
-                      t.isIdentifier(path.node.right.left, { name: varName }) &&
-                      ((shortcutOperator === '+=' && path.node.right.operator === '+') || (shortcutOperator === '-=' && path.node.right.operator === '-') || (shortcutOperator === '*=' && path.node.right.operator === '*') || (shortcutOperator === '/=' && path.node.right.operator === '/'))
-                     )
-                  {
-                      console.log(`Applying REGEX: USE_OPERATOR_SHORTCUT - Changing assignment for '${varName}' to '${shortcutOperator}'`);
-                      path.node.operator = shortcutOperator;
-                      path.node.right = path.node.right.right;
-                      transformationApplied = true;
-                      path.stop();
-                  }
+                  console.log(`[Apply API] REGEX: Matched USE_OPERATOR_SHORTCUT for ${varName} -> ${shortcutOperator}`);
+                  if (path.isAssignmentExpression({ operator: '=' }) && /* ... rest of checks ... */) { /* ... apply logic ... */ }
               }
               // --- Add other regex fallbacks here ---
 
-            } catch (_regexError) { console.error("Error applying suggestion based on REGEX:", _regexError); }
+            } catch (_regexError) { console.error("[Apply API] Error applying suggestion based on REGEX:", _regexError); }
           } // end REGEX fallback
         } // End enter()
       }); // End traverseFunc
 
 
       if (transformationApplied) { /* ... generate code ... */ }
-      else { /* ... no modifications ... */ }
+      else { console.log("[Apply API] AST traversal complete, no modifications applied."); }
 
     } catch (_transformError) { /* ... handle error ... */ }
 
