@@ -4,7 +4,7 @@
 // Import React hooks for state management
 import React, { useState } from 'react';
 // Import icons from lucide-react
-import { Lightbulb, Info, AlertTriangle, LoaderCircle, Wand2 } from 'lucide-react'; // Added Wand2 for Apply button
+import { Lightbulb, Info, AlertTriangle, LoaderCircle, Wand2 } from 'lucide-react';
 
 // Define suggestion structure (can be moved to a types file later)
 interface Suggestion {
@@ -22,17 +22,18 @@ export default function App() {
   const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null);
   // State for loading suggestions
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
-  // State for API errors
+  // State for API errors (can be from /analyze or /apply)
   const [error, setError] = useState<string | null>(null);
-  // State for tracking which suggestion is currently being applied (optional, for future loading state)
+  // State for tracking which suggestion is currently being applied
   const [applyingSuggestionIndex, setApplyingSuggestionIndex] = useState<number | null>(null);
 
   // --- Handler for Analyze Button ---
   const handleAnalyzeClick = async () => {
-    if (isLoadingSuggestions || !inputCode.trim()) return;
+    // Reset states before analysis
+    if (isLoadingSuggestions || applyingSuggestionIndex !== null || !inputCode.trim()) return;
     setSuggestions(null);
     setError(null);
-    setIsLoadingSuggestions(true); // Use specific loading state
+    setIsLoadingSuggestions(true);
     console.log("Sending code for analysis:", inputCode);
 
     try {
@@ -57,42 +58,66 @@ export default function App() {
     } catch (err) {
       console.error("Error analyzing code:", err);
       setError(err instanceof Error ? err.message : "Failed to analyze code. Please try again.");
+       setSuggestions(null); // Clear suggestions on error
     } finally {
-      setIsLoadingSuggestions(false); // Reset specific loading state
+      setIsLoadingSuggestions(false);
     }
   };
 
   // --- Handler for Apply Suggestion Button ---
-  const handleApplySuggestionClick = async (suggestion: Suggestion, index: number) => {
+  const handleApplySuggestionClick = async (suggestionToApply: Suggestion, index: number) => {
     // Prevent applying if already applying or loading suggestions
     if (applyingSuggestionIndex !== null || isLoadingSuggestions) return;
 
-    console.log(`Apply button clicked for suggestion ${index}:`, suggestion);
-    setApplyingSuggestionIndex(index); // Set loading state for this specific button (optional)
+    console.log(`Apply button clicked for suggestion ${index}:`, suggestionToApply);
+    setApplyingSuggestionIndex(index); // Set loading state for this specific button
     setError(null); // Clear previous errors
 
-    // ** Placeholder for calling the NEW /api/apply endpoint **
-    // We will implement this logic in the next steps.
-    // It will involve sending `inputCode` and `suggestion` to the backend.
-    // For now, just simulate a delay.
     try {
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
-        console.log("Simulated applying suggestion - SUCCESS (no actual change yet)");
-        // In a real scenario, the backend would return the modified code,
-        // and we would update the inputCode state here:
-        // setInputCode(modifiedCodeFromBackend);
-        // setSuggestions(null); // Clear old suggestions as code has changed
+      // --- Call the NEW /api/apply endpoint ---
+      const response = await fetch('/api/apply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          // Send the current code and the specific suggestion object
+          body: JSON.stringify({ code: inputCode, suggestion: suggestionToApply }),
+      });
+
+      if (!response.ok) {
+          let errorMsg = `Apply failed! Status: ${response.status}`;
+           try {
+               const errorData = await response.json();
+               errorMsg = errorData.error || `Server responded with status ${response.status}`;
+           } catch (_e) { console.log("Ignoring error while parsing apply error response body."); }
+           throw new Error(errorMsg);
+      }
+
+      // Get the modified code back from the API
+      const data = await response.json();
+
+      if (typeof data.modifiedCode === 'string') {
+          console.log("Suggestion applied (backend returned code). Updating input.");
+          // Update the code in the textarea with the result from the backend
+          setInputCode(data.modifiedCode);
+          // Clear the old suggestions as the code has changed
+          setSuggestions(null);
+      } else {
+          // Handle cases where backend didn't return expected data
+          throw new Error("Invalid response received from apply API.");
+      }
+      // --- End API Call ---
+
     } catch (applyErr) {
         console.error("Error applying suggestion:", applyErr);
         setError(applyErr instanceof Error ? applyErr.message : "Failed to apply suggestion.");
     } finally {
         setApplyingSuggestionIndex(null); // Reset loading state for this button
     }
-    // ** End Placeholder **
   };
 
 
   // --- Render the UI ---
+  // (The JSX structure remains the same as the previous version with the Apply button)
+  // ... rest of the component ...
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-gray-100 font-sans p-4 sm:p-8">
       <div className="max-w-4xl mx-auto">
@@ -126,11 +151,11 @@ export default function App() {
 
             <button
               onClick={handleAnalyzeClick}
-              disabled={isLoadingSuggestions || !inputCode.trim()} // Use specific loading state
+              disabled={isLoadingSuggestions || applyingSuggestionIndex !== null || !inputCode.trim()} // Also disable analyze while applying
               className={`
                 mt-4 w-full sm:w-auto px-6 py-2.5 rounded-md font-semibold transition-all duration-200 ease-in-out
                 flex items-center justify-center space-x-2 text-base
-                ${isLoadingSuggestions
+                ${(isLoadingSuggestions || applyingSuggestionIndex !== null)
                   ? 'bg-gray-600 cursor-not-allowed'
                   : !inputCode.trim()
                     ? 'bg-gray-500 text-gray-400 cursor-not-allowed'
@@ -186,27 +211,30 @@ export default function App() {
                            <p className="font-semibold text-cyan-300 text-base">{item.suggestion}</p>
                         </div>
                         {/* Explanation */}
-                        <div className="pl-7 mb-3"> {/* Indent explanation slightly */}
+                        <div className="pl-7 mb-3">
                            <p className="text-gray-300 text-sm leading-relaxed">{item.explanation}</p>
                         </div>
                         {/* Apply Button */}
-                        <div className="pl-7"> {/* Indent button */}
+                        <div className="pl-7">
                            <button
                              onClick={() => handleApplySuggestionClick(item, index)}
-                             disabled={applyingSuggestionIndex === index || isLoadingSuggestions} // Disable specific button while applying or loading all suggestions
+                             // Disable specific button while applying OR disable all if suggestions are loading
+                             disabled={applyingSuggestionIndex === index || isLoadingSuggestions}
                              className={`
                                px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-150 ease-in-out
                                flex items-center space-x-1.5
                                ${applyingSuggestionIndex === index
-                                 ? 'bg-gray-500 cursor-wait' // Style when this specific suggestion is being applied
-                                 : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow hover:shadow-md transform hover:-translate-y-px'
+                                 ? 'bg-gray-500 cursor-wait'
+                                 : isLoadingSuggestions // Also disable if suggestions are loading
+                                   ? 'bg-indigo-800 text-gray-400 cursor-not-allowed'
+                                   : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow hover:shadow-md transform hover:-translate-y-px'
                                }
                              `}
                            >
                              {applyingSuggestionIndex === index ? (
                                <LoaderCircle className="animate-spin h-4 w-4" />
                              ) : (
-                               <Wand2 className="h-4 w-4" /> // Magic wand icon
+                               <Wand2 className="h-4 w-4" />
                              )}
                              <span>{applyingSuggestionIndex === index ? 'Applying...' : 'Apply Fix'}</span>
                            </button>
