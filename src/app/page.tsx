@@ -41,13 +41,15 @@ export default function App() {
         let errorMsg = `HTTP error! Status: ${response.status}`;
         try {
             const errorData = await response.json();
-            errorMsg = errorData.error || `Server responded with status ${response.status}`; // Use API error or status
-        } catch (e) { /* Ignore if response body is not JSON */ }
+            errorMsg = errorData.error || `Server responded with status ${response.status}`;
+        } catch (_e) { // <--- RENAMED 'e' to '_e' HERE to mark as intentionally unused
+            /* Ignore if response body is not JSON */
+            console.log("Ignoring error while parsing error response body."); // Optional: log that you ignored it
+        }
         throw new Error(errorMsg);
       }
 
       const data = await response.json();
-      // Ensure suggestions is always an array, even if API returns null/undefined
       setSuggestions(data.suggestions || []);
 
     } catch (err) {
