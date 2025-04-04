@@ -80,7 +80,7 @@ Follow these instructions to get a copy of the project up and running on your lo
 
 ## Hackathon
 
-This project was created for the [Next.js Global Hackathon](https://nextjs.org/hackathon) (AI Theme).
+This project was created for the [Next.js Global Hackathon](https://next-hackathon-2025.vercel.app/) (AI Theme).
 
 ## License
 
