@@ -4,7 +4,7 @@
 
 A web application built for the Next.js Global Hackathon that uses AI to provide refactoring suggestions for JavaScript/React code snippets. Enter your code, and get AI-powered advice on how to improve its readability, maintainability, and adherence to best practices.
 
-![Screenshot of App](https://i.imgur.com/M1ZwGBh.png)
+![Screenshot of App](https://i.imgur.com/8Ik3DhL.png)
 
 ## Features
 
