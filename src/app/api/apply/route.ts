@@ -72,8 +72,6 @@ export async function POST(request: Request) {
           try {
             if (!transformationApplied) { // Only attempt if not already applied
               const currentType = suggestion.type;
-              // Optional: Log node type only if needed for deep debugging
-              // console.log(`[Apply API] Checking node type: ${path.node.type}, Suggestion type: ${currentType}`);
 
               // --- Handle USE_CONST ---
               if (currentType === 'USE_CONST') {
@@ -97,10 +95,8 @@ export async function POST(request: Request) {
               else if (currentType === 'RENAME_VARIABLE') {
                   const oldName = getParam(suggestion.params, 'oldName');
                   const newName = getParam(suggestion.params, 'newName');
-                  // Ensure path.scope exists before checking hasBinding
                   if (oldName && newName && path.scope?.hasBinding(oldName)) {
                       const binding = path.scope.getBinding(oldName);
-                      // Ensure it's not a function declaration if we only want variables
                       if (binding?.path.type !== 'FunctionDeclaration') {
                           console.log(`[Apply API] TYPE: Applying RENAME_VARIABLE for ${oldName} -> ${newName}`);
                           path.scope.rename(oldName, newName);
@@ -117,7 +113,6 @@ export async function POST(request: Request) {
                   const newFunctionName = getParam(suggestion.params, 'newName');
                   if (oldFunctionName && newFunctionName && path.isFunctionDeclaration() && path.node.id?.name === oldFunctionName) {
                       console.log(`[Apply API] TYPE: Applying RENAME_FUNCTION for ${oldFunctionName} -> ${newFunctionName}`);
-                      // Ensure path.scope exists before accessing parent
                       const scopeToRenameIn = path.scope?.parent ?? path.scope;
                       if (scopeToRenameIn?.hasBinding(oldFunctionName)) {
                            scopeToRenameIn.rename(oldFunctionName, newFunctionName);
@@ -130,7 +125,6 @@ export async function POST(request: Request) {
               else if (currentType === 'USE_TEMPLATE_LITERAL') {
                  if (path.isCallExpression() && t.isMemberExpression(path.node.callee) && t.isIdentifier(path.node.callee.object, { name: "console" }) && t.isIdentifier(path.node.callee.property, { name: "log" })) {
                      const firstArg = path.node.arguments[0];
-                     // Basic check for "string" + identifier
                      if (t.isBinaryExpression(firstArg) && firstArg.operator === '+' && t.isStringLiteral(firstArg.left) && t.isIdentifier(firstArg.right)) {
                          console.log(`[Apply API] TYPE: Applying USE_TEMPLATE_LITERAL - Replacing console.log argument ("string" + id)`);
                          const quasis = [ t.templateElement({ raw: firstArg.left.value, cooked: firstArg.left.value }), t.templateElement({ raw: '', cooked: '' }, true) ];
@@ -139,7 +133,6 @@ export async function POST(request: Request) {
                          transformationApplied = true;
                          path.stop();
                      }
-                     // Add check for identifier + "string"
                      else if (t.isBinaryExpression(firstArg) && firstArg.operator === '+' && t.isIdentifier(firstArg.left) && t.isStringLiteral(firstArg.right)) {
                          console.log(`[Apply API] TYPE: Applying USE_TEMPLATE_LITERAL - Replacing console.log argument (id + "string")`);
                          const quasis = [ t.templateElement({ raw: '', cooked: '' }), t.templateElement({ raw: firstArg.right.value, cooked: firstArg.right.value }, true) ];
@@ -158,11 +151,7 @@ export async function POST(request: Request) {
                     t.isIdentifier(path.node.left, { name: variable }) &&
                     t.isBinaryExpression(path.node.right) &&
                     t.isIdentifier(path.node.right.left, { name: variable }) &&
-                    // Check operator consistency
-                    ((operator === '+=' && path.node.right.operator === '+') ||
-                     (operator === '-=' && path.node.right.operator === '-') ||
-                     (operator === '*=' && path.node.right.operator === '*') ||
-                     (operator === '/=' && path.node.right.operator === '/'))
+                    ((operator === '+=' && path.node.right.operator === '+') || (operator === '-=' && path.node.right.operator === '-') || (operator === '*=' && path.node.right.operator === '*') || (operator === '/=' && path.node.right.operator === '/'))
                    )
                 {
                     console.log(`[Apply API] TYPE: Applying USE_OPERATOR_SHORTCUT for '${variable}' to '${operator}'`);
