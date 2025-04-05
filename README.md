@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Live Demo:** [https://ai-refactor-tutor.vercel.app/](https://ai-refactor-tutor.vercel.app/)
+**Live Demo:** [https://www.airefactortutor.com/](https://www.airefactortutor.com/)
 
 A web application built for the Next.js Global Hackathon that uses AI to provide refactoring suggestions for JavaScript/React code snippets. Enter your code, get AI-powered advice, and even apply some common fixes directly!
 
