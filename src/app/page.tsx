@@ -6,10 +6,12 @@
 import React, { useState } from 'react';
 // Import icons from lucide-react
 import { Lightbulb, Info, AlertTriangle, LoaderCircle, Wand2, Copy, Check } from 'lucide-react';
+// Import Monaco Editor
+import Editor from '@monaco-editor/react'; // Default import
 
 // Define suggestion structure (can be moved to a types file later)
 interface Suggestion {
-  suggestion: string;
+  suggestion: string; // Keep suggestion required for now based on original baseline
   explanation: string;
   // Keep optional fields needed by handleApplySuggestionClick
   type?: string;
@@ -33,6 +35,12 @@ export default function App() {
   // State for copy button feedback
   const [copySuccess, setCopySuccess] = useState(false);
 
+  // --- Handler for Editor Change ---
+  function handleEditorChange(value: string | undefined) {
+    // Update the inputCode state with the editor's current value.
+    // If the value is undefined (which can happen in some edge cases), default to an empty string.
+    setInputCode(value || '');
+  }
 
   // --- Handler for Analyze Button ---
   const handleAnalyzeClick = async () => {
@@ -103,7 +111,7 @@ export default function App() {
 
       if (typeof data.modifiedCode === 'string') {
           console.log("Suggestion applied (backend returned code). Updating input.");
-          // Update the code in the textarea with the result from the backend
+          // Update the code state. The Editor component will automatically reflect this change.
           setInputCode(data.modifiedCode);
           // Clear the old suggestions as the code has changed
           setSuggestions(null);
@@ -114,10 +122,10 @@ export default function App() {
       // --- End API Call ---
 
     } catch (applyErr) {
-        console.error("Error applying suggestion:", applyErr);
-        setError(applyErr instanceof Error ? applyErr.message : "Failed to apply suggestion.");
+       console.error("Error applying suggestion:", applyErr);
+       setError(applyErr instanceof Error ? applyErr.message : "Failed to apply suggestion.");
     } finally {
-        setApplyingSuggestionIndex(null); // Reset loading state for this button
+       setApplyingSuggestionIndex(null); // Reset loading state for this button
     }
   };
 
@@ -148,33 +156,52 @@ export default function App() {
 
         {/* Header */}
         <header className="mb-8 text-center">
-             <h1 className="text-3xl sm:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 mb-2">
-               AI Code Refactor Tutor
-             </h1>
-             <p className="text-gray-400 text-sm sm:text-base">
-               Paste your JavaScript/React code below to get AI-powered refactoring suggestions.
-             </p>
+            <h1 className="text-3xl sm:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 mb-2">
+              AI Code Refactor Tutor
+            </h1>
+            <p className="text-gray-400 text-sm sm:text-base">
+              Paste your JavaScript/React code below to get AI-powered refactoring suggestions.
+            </p>
         </header>
 
         {/* Main Content Area */}
         <main className="space-y-6">
 
           {/* Code Input Section */}
-          <div className="bg-gray-800 rounded-lg shadow-lg p-4 sm:p-6">
-            <label htmlFor="codeInput" className="block text-lg font-semibold mb-3 text-gray-300">
+          {/* MODIFIED: Added space-y-4 here for consistency */}
+          <div className="bg-gray-800 rounded-lg shadow-lg p-4 sm:p-6 space-y-4">
+            <label className="block text-lg font-semibold text-gray-300">
               Paste Your Code Snippet:
             </label>
-            <textarea
-              id="codeInput"
-              value={inputCode}
-              onChange={(e) => setInputCode(e.target.value)}
-              placeholder="// Paste your code here..."
-              className="w-full h-48 sm:h-64 p-3 bg-gray-900 text-gray-200 border border-gray-700 rounded-md focus:ring-2 focus:ring-cyan-500 focus:outline-none font-mono text-sm resize-none shadow-inner"
-              spellCheck="false"
-            />
+            {/* REMOVED: textarea */}
+            {/* ADDED: Monaco Editor Component */}
+            {/* Assign an id for the label, although direct interaction might differ */}
+            <div id="codeInput" className="border border-gray-700 rounded-md overflow-hidden shadow-inner">
+              <Editor
+                // Set height using rem units (approx h-56)
+                height="14rem"
+                language="javascript"
+                theme="vs-dark" // Use VS Code dark theme
+                value={inputCode}
+                onChange={handleEditorChange} // Connect to our handler
+                options={{
+                  minimap: { enabled: false }, // Disable minimap
+                  fontSize: 14,
+                  wordWrap: 'on', // Enable word wrapping
+                  scrollBeyondLastLine: false, // Don't scroll past the last line
+                  automaticLayout: true, // Adjust layout on resize
+                  tabSize: 2, // Use 2 spaces for tabs
+                  insertSpaces: true, // Insert spaces when tab is pressed
+                  padding: { top: 10, bottom: 10 } // Add some internal padding
+                }}
+                // Optional: Loading indicator while Monaco loads
+                // loading={<div className="h-[14rem] flex justify-center items-center text-gray-400">Loading Editor...</div>}
+              />
+            </div>
 
             {/* Button Row */}
-            <div className="mt-4 flex flex-wrap gap-3">
+            {/* MODIFIED: Added pt-2 for spacing */}
+            <div className="pt-2 flex flex-wrap gap-3">
                 {/* Analyze Button */}
                 <button
                   onClick={handleAnalyzeClick}
@@ -190,103 +217,104 @@ export default function App() {
                     }
                   `}
                 >
-                   {isLoadingSuggestions ? ( <><LoaderCircle className="animate-spin h-5 w-5 mr-2" />Analyzing...</> ) : ('Analyze Code')}
+                    {isLoadingSuggestions ? ( <><LoaderCircle className="animate-spin h-5 w-5 mr-2" />Analyzing...</> ) : ('Analyze Code')}
                 </button>
 
                 {/* Copy Code Button */}
                 <button
-                   onClick={handleCopyClick}
-                   disabled={!inputCode.trim()} // Disable if no code
-                   className={`
-                     px-4 py-2.5 rounded-md font-semibold transition-all duration-200 ease-in-out
-                     flex items-center justify-center space-x-2 text-base text-gray-200
-                     border border-gray-600 hover:border-gray-500
-                     ${!inputCode.trim()
-                       ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                       : copySuccess
-                         ? 'bg-green-700 border-green-600 cursor-default' // Success state
-                         : 'bg-gray-700 hover:bg-gray-600' // Default state
-                     }
-                   `}
-                 >
-                   {copySuccess ? (
-                     <Check className="h-5 w-5 text-white" />
-                   ) : (
-                     <Copy className="h-5 w-5" />
-                   )}
-                   <span>{copySuccess ? 'Copied!' : 'Copy Code'}</span>
-                 </button>
+                    onClick={handleCopyClick}
+                    disabled={!inputCode.trim()} // Disable if no code
+                    className={`
+                      px-4 py-2.5 rounded-md font-semibold transition-all duration-200 ease-in-out
+                      flex items-center justify-center space-x-2 text-base text-gray-200
+                      border border-gray-600 hover:border-gray-500
+                      ${!inputCode.trim()
+                        ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                        : copySuccess
+                          ? 'bg-green-700 border-green-600 cursor-default' // Success state
+                          : 'bg-gray-700 hover:bg-gray-600' // Default state
+                      }
+                    `}
+                  >
+                    {copySuccess ? (
+                      <Check className="h-5 w-5 text-white" />
+                    ) : (
+                      <Copy className="h-5 w-5" />
+                    )}
+                    <span>{copySuccess ? 'Copied!' : 'Copy Code'}</span>
+                  </button>
             </div> {/* End Button Row */}
 
           </div>
 
           {/* --- Status/Results Area --- */}
           <div className="mt-6">
-             {/* Loading State */}
-             {isLoadingSuggestions && (
-               <div className="flex justify-center items-center space-x-2 text-lg text-cyan-400 py-6">
-                   <LoaderCircle className="animate-spin h-6 w-6" />
-                   <span>Thinking... Please wait.</span>
-               </div>
-             )}
-             {/* Error State */}
-             {error && !isLoadingSuggestions && (
-               <div className="bg-red-900/50 border border-red-700 text-red-100 px-4 py-3 rounded-lg shadow-lg flex items-start space-x-3" role="alert">
-                 <AlertTriangle className="h-5 w-5 text-red-300 mt-0.5 flex-shrink-0" />
-                 <div>
-                     <strong className="font-bold block">Error:</strong>
-                     <span>{error}</span>
-                 </div>
-               </div>
-             )}
-             {/* Suggestions Display Section */}
-             {suggestions && !isLoadingSuggestions && !error && (
-                <div className="bg-gray-800 rounded-lg shadow-lg p-4 sm:p-6">
-                    <h2 className="text-xl font-semibold mb-4 text-gray-200 border-b border-gray-700 pb-2">Suggestions:</h2>
-                    {suggestions.length > 0 ? (
-                      <ul className="space-y-5">
-                        {suggestions.map((item, index) => (
-                          <li key={index} className="bg-gray-700/60 p-4 rounded-lg border border-gray-600 shadow-md">
-                            {/* Suggestion Title with Icon */}
-                            <div className="flex items-center space-x-2 mb-2">
-                               <Lightbulb className="h-5 w-5 text-yellow-400 flex-shrink-0" />
-                               <p className="font-semibold text-cyan-300 text-base">{item.suggestion}</p>
-                            </div>
-                            {/* Explanation */}
-                            <div className="pl-7 mb-3">
-                               <p className="text-gray-300 text-sm leading-relaxed">{item.explanation}</p>
-                            </div>
-                            {/* Apply Button */}
-                            <div className="pl-7">
-                              <button
-                                onClick={() => handleApplySuggestionClick(item, index)}
-                                disabled={applyingSuggestionIndex === index || isLoadingSuggestions}
-                                className={`
-                                  px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-150 ease-in-out
-                                  flex items-center space-x-1.5
-                                  ${applyingSuggestionIndex === index
-                                    ? 'bg-gray-500 cursor-wait'
-                                    : isLoadingSuggestions
-                                      ? 'bg-indigo-800 text-gray-400 cursor-not-allowed'
-                                      : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow hover:shadow-md transform hover:-translate-y-px'
-                                  }
-                                `}
-                              >
-                                {applyingSuggestionIndex === index ? ( <LoaderCircle className="animate-spin h-4 w-4" /> ) : ( <Wand2 className="h-4 w-4" /> )}
-                                <span>{applyingSuggestionIndex === index ? 'Applying...' : 'Apply Fix'}</span>
-                              </button>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                       <div className="flex items-center space-x-2 text-gray-400 p-3 bg-gray-700/50 rounded-md border border-gray-600">
-                           <Info className="h-5 w-5 flex-shrink-0" />
-                           <p>No specific refactoring suggestions found for this code snippet. It might already be quite clean!</p>
-                       </div>
-                    )}
+              {/* Loading State */}
+              {isLoadingSuggestions && (
+                <div className="flex justify-center items-center space-x-2 text-lg text-cyan-400 py-6">
+                    <LoaderCircle className="animate-spin h-6 w-6" />
+                    <span>Thinking... Please wait.</span>
                 </div>
-             )}
+              )}
+              {/* Error State */}
+              {error && !isLoadingSuggestions && (
+                <div className="bg-red-900/50 border border-red-700 text-red-100 px-4 py-3 rounded-lg shadow-lg flex items-start space-x-3" role="alert">
+                  <AlertTriangle className="h-5 w-5 text-red-300 mt-0.5 flex-shrink-0" />
+                  <div>
+                      <strong className="font-bold block">Error:</strong>
+                      <span>{error}</span>
+                  </div>
+                </div>
+              )}
+              {/* Suggestions Display Section */}
+              {suggestions && !isLoadingSuggestions && !error && (
+                 <div className="bg-gray-800 rounded-lg shadow-lg p-4 sm:p-6">
+                   <h2 className="text-xl font-semibold mb-4 text-gray-200 border-b border-gray-700 pb-2">Suggestions:</h2>
+                   {suggestions.length > 0 ? (
+                     <ul className="space-y-5">
+                       {suggestions.map((item, index) => (
+                         <li key={index} className="bg-gray-700/60 p-4 rounded-lg border border-gray-600 shadow-md">
+                           {/* Suggestion Title with Icon */}
+                           <div className="flex items-center space-x-2 mb-2">
+                               <Lightbulb className="h-5 w-5 text-yellow-400 flex-shrink-0" />
+                               {/* Made suggestion text optional in interface, check here */}
+                               <p className="font-semibold text-cyan-300 text-base">{item.suggestion || `Suggestion ${index + 1}`}</p>
+                           </div>
+                           {/* Explanation */}
+                           <div className="pl-7 mb-3">
+                               <p className="text-gray-300 text-sm leading-relaxed">{item.explanation}</p>
+                           </div>
+                           {/* Apply Button */}
+                           <div className="pl-7">
+                             <button
+                               onClick={() => handleApplySuggestionClick(item, index)}
+                               disabled={applyingSuggestionIndex === index || isLoadingSuggestions}
+                               className={`
+                                 px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-150 ease-in-out
+                                 flex items-center space-x-1.5
+                                 ${applyingSuggestionIndex === index
+                                   ? 'bg-gray-500 cursor-wait'
+                                   : isLoadingSuggestions
+                                     ? 'bg-indigo-800 text-gray-400 cursor-not-allowed'
+                                     : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow hover:shadow-md transform hover:-translate-y-px'
+                                 }
+                               `}
+                             >
+                               {applyingSuggestionIndex === index ? ( <LoaderCircle className="animate-spin h-4 w-4" /> ) : ( <Wand2 className="h-4 w-4" /> )}
+                               <span>{applyingSuggestionIndex === index ? 'Applying...' : 'Apply Fix'}</span>
+                             </button>
+                           </div>
+                         </li>
+                       ))}
+                     </ul>
+                   ) : (
+                      <div className="flex items-center space-x-2 text-gray-400 p-3 bg-gray-700/50 rounded-md border border-gray-600">
+                          <Info className="h-5 w-5 flex-shrink-0" />
+                          <p>No specific refactoring suggestions found for this code snippet. It might already be quite clean!</p>
+                      </div>
+                   )}
+                 </div>
+              )}
           </div> {/* End Status/Results Area */}
 
         </main>
