@@ -64,6 +64,7 @@ async function callAnthropicModel(
 
     // Attempt to find a JSON array within the response
     // Handles cases where the model might add introductory/closing text
+    // Uses 's' flag (dotAll) - requires tsconfig target >= es2018
     const jsonMatch = trimmedAiText.match(/(\[.*\])/s);
     const jsonString = jsonMatch ? jsonMatch[0] : null;
 
@@ -127,7 +128,7 @@ export async function POST(request: Request) {
     console.log("Code snippet received:", code.substring(0, 100) + "...");
 
     // --- Define the AI Prompt ---
-    // Added clarification for RENAME_VARIABLE params based on previous work
+    // Updated prompt with clarifications for params based on previous work
     const prompt = `
       Analyze the following JavaScript/React code snippet for potential basic refactoring improvements suitable for a beginner learning clean code principles. Focus on readability, maintainability, and common best practices like variable naming (camelCase), const/let usage, operator choice, string formatting, and potential use of array methods.
 
